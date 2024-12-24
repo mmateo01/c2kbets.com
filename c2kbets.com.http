@@ -1,0 +1,6 @@
+@c2kbets.com_HostAddress = http://localhost:5057
+
+GET {{c2kbets.com_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
