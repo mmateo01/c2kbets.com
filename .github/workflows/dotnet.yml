@@ -15,7 +15,7 @@ jobs:
     
     - name: Build the Docker image
       working-directory: Dockerized/Hello
-      run: docker build . -t mmateo01/c2kbets.com:latest
+      run: docker build -f C:/Projects/c2kbets.com . -t mmateo01/c2kbets.com:latest
 
     - name: Log into Docker Hub
       uses: docker/login-action@v2
