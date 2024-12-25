@@ -1,62 +1,39 @@
 # This workflow will build a .NET project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
 
-name: .NET
+name: Backend Deployment
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-  build:
-
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    - uses: actions/checkout@v3
+    
+    - name: Build the Docker image
+      working-directory: Dockerized/Hello
+      run: docker build . -t mmateo01/c2kbets.com:latest
+
+    - name: Log into Docker Hub
+      uses: docker/login-action@v2
       with:
-        dotnet-version: 8.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
-      
-    - name: DotNet Publish
-      run: dotnet publish -c Release
-      
-    - name: Stop c2kbets.com Service
-      uses: garygrossgarten/github-action-ssh@v0.6.3
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Push the image to Docker Hub
+      run: docker push mmateo01/c2kbets.com
+
+    - name: Pull the image to VM
+      uses: appleboy/ssh-action@v1.0.0
       with:
-        command: service c2kbets.com stop
-        host: ${{ secrets.REMOTE_HOST }}
-        username: ${{ secrets.REMOTE_USER }}
-        passphrase: ${{ secrets.PASSPHRASE }}
-        privateKey: ${{ secrets.REMOTE_SSH_KEY }}
-      
-    - name: Copy to Server via SCP
-      uses: garygrossgarten/github-action-scp@release
-      with:
-        local: ${{ github.workspace }}/bin/Release/net8.0/publish/
-        concurrency: 10
-        remote: ${{ secrets.REMOTE_TARGET }}
-        host: ${{ secrets.REMOTE_HOST }}
-        username: ${{ secrets.REMOTE_USER }}
-        passphrase: ${{ secrets.PASSPHRASE }}
-        privateKey: ${{ secrets.REMOTE_SSH_KEY }}
-      env:
-        ASPNETCORE_ENVIRONMENT: Production
-        
-    - name: Start c2kbets.com Service
-      uses: garygrossgarten/github-action-ssh@v0.6.3
-      with:
-        command: service c2kbets.com start
-        host: ${{ secrets.REMOTE_HOST }}
-        username: ${{ secrets.REMOTE_USER }}
-        passphrase: ${{ secrets.PASSPHRASE }}
-        privateKey: ${{ secrets.REMOTE_SSH_KEY }}
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: 
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/hello:latest
+          docker stop hello || true
+          docker rm hello || true
+          docker run -d -p 80:80 --name hello ${{ secrets.DOCKERHUB_USERNAME }}/hello:latest
